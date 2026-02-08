@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>English Flash Cards</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #e2e8f0; /* 전체 페이지 배경 (더 짙은 회색) */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      width: 100%; height: 100%;
+      display: flex; justify-content: center; align-items: center;
+      padding: 20px; box-sizing: border-box;
+    }
+
+    /* ===== 카드 프레임: 내부 배경을 밝은 회색으로 변경 ===== */
+    .card-frame {
+      width: 100%; max-width: 900px; height: 70vh;
+      background: #f1f5f9; /* 카드 뒤쪽 배경색 (밝은 회색) */
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      padding: 24px; box-sizing: border-box;
+      position: relative; overflow: hidden; perspective: 1200px;
+      border: 1px solid #e2e8f0;
+    }
+
+    @media (max-aspect-ratio: 1/1) {
+      .card-frame { height: 80vh; max-height: 700px; }
+      .front-word { font-size: 10vw !important; }
+      .back-meaning { font-size: 8vw !important; }
+    }
+
+    /* ===== 초기 입력 화면 ===== */
+    .input-screen {
+      width: 100%; height: 100%; display: flex;
+      flex-direction: column; gap: 16px; position: relative; z-index: 10;
+    }
+
+    .input-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) { .input-grid { grid-template-columns: 1fr; } }
+
+    .input-grid input {
+      width: 100%; padding: 12px; font-size: 16px; border-radius: 12px;
+      border: 1px solid #cbd5e1; box-sizing: border-box; text-align: center;
+      background: white;
+    }
+
+    .favorites-list-container {
+      flex: 1; border: 1px solid #e2e8f0; border-radius: 12px;
+      background: white; display: flex; flex-direction: column;
+      overflow: hidden; /* 헤더 고정을 위해 전체 오버플로우 숨김 */
+    }
+
+    .favorites-header {
+      display: flex; justify-content: center; align-items: center;
+      padding: 8px 16px; font-size: 14px; font-weight: 700;
+      color: #475569; border-bottom: 1px solid #e2e8f0; background: #f8fafc; position: relative;
+    }
+
+    .favorites-items { 
+      padding: 8px; display: flex; flex-direction: column; gap: 4px;
+      flex: 1; overflow-y: auto; /* 내용물 부분만 스크롤 적용 */
+    }
+
+    .fav-item {
+      padding: 10px 12px; background: white; border-radius: 8px; font-size: 14px;
+      border: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    }
+    .fav-del-btn { color: #94a3b8; padding: 4px 8px; cursor: pointer; }
+
+    .input-bottom { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .input-bottom button { flex: 1; padding: 14px; font-size: 16px; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; }
+
+    .apply-button { background: #2563eb; color: white; }
+    .apply-button.disabled { background: #94a3b8; cursor: not-allowed; }
+    .create-button { background: #2563eb; color: white; }
+    .create-button.disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* 이전 카드 내부에 있던 saved-count 스타일 유지하되 필요시 로직으로 제어 */
+    .saved-count-text { font-size: 14px; color: #2563eb; position: absolute; right: 16px; }
+
+    /* ===== 카드 컨테이너 및 스택 애니메이션 ===== */
+    .card-container { width: 100%; height: 100%; position: relative; display: flex; justify-content: center; align-items: center; z-index: 5; }
+
+    .card-stack { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+    
+    .stack-card {
+      width: 100%; height: 100%; position: absolute;
+      border-radius: 24px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s;
+    }
+
+    .card {
+      width: 100%; height: 100%; position: absolute;
+      top: 0; left: 0; transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s; cursor: pointer;
+    }
+
+    .card.is-flipped { transform: rotateY(180deg); }
+    .slide-out-anim { transform: translateX(-150%) !important; opacity: 0 !important; }
+
+    .card-face {
+      width: 100%; height: 100%; position: absolute;
+      backface-visibility: hidden; border-radius: 24px; box-sizing: border-box;
+      padding: 40px 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; 
+      background: white;
+    }
+    .card-back { transform: rotateY(180deg); }
+
+    .fav-btn { position: absolute; top: 16px; left: 16px; background: none; border: none; font-size: 28px; cursor: pointer; color: #cbd5e1; z-index: 30; }
+    .fav-btn.active { color: #fbbf24; }
+
+    .toast-msg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.9); color: white; padding: 14px 28px;
+      border-radius: 20px; font-weight: 600; opacity: 0; transition: opacity 0.4s; z-index: 200;
+    }
+    .toast-msg.show { opacity: 1; }
+
+    .top-right-controls { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; z-index: 30; }
+    .icon-button { width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 20px; cursor: pointer; background: #f1f5f9; display: flex; justify-content: center; align-items: center; border: 1px solid #e2e8f0; }
+    .icon-button.correct.active { background: #22c55e !important; color: white !important; border-color: #22c55e; }
+    .icon-button.wrong.active { background: #ef4444 !important; color: white !important; border-color: #ef4444; }
+
+    /* 사운드 버튼 스타일 */
+    .icon-button.sound { font-size: 18px; color: #64748b; }
+    .icon-button.sound:hover { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
+
+    .bottom-right { position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 12px; z-index: 30; }
+    .nav-button { padding: 12px 24px; font-size: 14px; font-weight: 600; border: none; border-radius: 12px; background: #2563eb; color: white; cursor: pointer; }
+    .nav-button.disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .front-word { font-size: 48px; font-weight: 800; text-align: center; word-break: break-word; color: #0f172a; }
+    .back-meaning { font-size: 32px; font-weight: 700; text-align: center; color: #1e293b; }
+    .back-example { font-size: 20px; font-weight: 500; text-align: center; margin: 20px 0; color: #334155; }
+    .back-translation { font-size: 16px; color: #64748b; text-align: center; }
+
+    .end-screen { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; text-align: center; z-index: 10; position: relative; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="card-frame" id="cardFrame"></div>
+  </div>
+
+  <script>
+    const cardFrame = document.getElementById("cardFrame");
+    let cards = [];
+    let initialCards = [];
+    let currentIndex = 0;
+    let wrongCards = [];
+    let favoriteCards = JSON.parse(localStorage.getItem('myFavoriteCards')) || [];
+    let lastScrollTop = 0;
+
+    /* TTS 설정 */
+    const synth = window.speechSynthesis;
+    let maleVoice = null;
+
+    function loadVoices() {
+      const voices = synth.getVoices();
+      maleVoice = voices.find(v => v.lang.startsWith('en') && (v.name.toLowerCase().includes('male') || v.name.includes('Google US English'))) || voices.find(v => v.lang.startsWith('en'));
+    }
+    if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    function speakText(e, text, isFront = false) {
+      e.stopPropagation(); 
+      if (synth.speaking) synth.cancel();
+      
+      let processedText = text;
+      if (isFront) {
+        // 요구사항: 앞면에서는 '~'는 읽지 않고 기호만 읽음
+        processedText = text.replace(/~/g, " ");
+      }
+      
+      const utter = new SpeechSynthesisUtterance(processedText);
+      if (maleVoice) utter.voice = maleVoice;
+      utter.lang = 'en-US';
+      utter.pitch = 0.9;
+      utter.rate = 0.9;
+      synth.speak(utter);
+    }
+
+    function saveFavorites() { localStorage.setItem('myFavoriteCards', JSON.stringify(favoriteCards)); }
+
+    function deleteFavorite(e, index) {
+      e.stopPropagation();
+      const container = document.querySelector(".favorites-items");
+      if (container) lastScrollTop = container.scrollTop;
+      favoriteCards.splice(index, 1);
+      saveFavorites();
+      renderInputScreen(true);
+    }
+
+    function renderInputScreen(restoreScroll = false) {
+      const containerBefore = document.querySelector(".favorites-items");
+      if (containerBefore && !restoreScroll) lastScrollTop = containerBefore.scrollTop;
+      
+      currentIndex = 0;
+      wrongCards = [];
+      const favoritesHTML = favoriteCards.length > 0 
+        ? favoriteCards.map((c, index) => `<div class="fav-item" onclick="applyFromFav(${index})"><span>${c.word}</span><span class="fav-del-btn" onclick="deleteFavorite(event, ${index})">✕</span></div>`).join('')
+        : '<div style="text-align:center; color:#94a3b8; padding:20px;">No favorites yet.</div>';
+      
+      cardFrame.innerHTML = `
+        <div id="toast" class="toast-msg"></div>
+        <div class="input-screen">
+          <div class="input-grid">
+            <input id="wordInput" placeholder="Word / Phrase" autocomplete="off" />
+            <input id="meaningInput" placeholder="Meaning" autocomplete="off" />
+            <input id="exampleInput" placeholder="English Example" autocomplete="off" />
+            <input id="translationInput" placeholder="Korean Translation" autocomplete="off" />
+          </div>
+          <div class="favorites-list-container">
+            <div class="favorites-header">
+              <span>Favorites (Click to Add)</span>
+              <span class="saved-count-text">Saved: ${cards.length}</span>
+            </div>
+            <div class="favorites-items">${favoritesHTML}</div>
+          </div>
+          <div class="input-bottom">
+            <button id="applyBtn" class="apply-button disabled" onclick="applyCard()" disabled>Apply</button>
+            <button id="createBtn" class="create-button ${cards.length > 0 ? '' : 'disabled'}" onclick="generateCards()" ${cards.length > 0 ? '' : 'disabled'}>Create</button>
+          </div>
+        </div>`;
+      
+      const containerAfter = document.querySelector(".favorites-items");
+      if (containerAfter) containerAfter.scrollTop = lastScrollTop;
+      attachInputListeners();
+    }
+
+    function applyFromFav(index) {
+      const fav = favoriteCards[index];
+      const container = document.querySelector(".favorites-items");
+      if (container) lastScrollTop = container.scrollTop;
+      if (cards.some(c => c.word === fav.word)) { showToast("Already added"); return; }
+      document.getElementById("wordInput").value = fav.word;
+      document.getElementById("meaningInput").value = fav.meaning;
+      document.getElementById("exampleInput").value = fav.example;
+      document.getElementById("translationInput").value = fav.translation;
+      updateApplyButton();
+      applyCard(true);
+    }
+
+    function attachInputListeners() {
+      const inputs = ["wordInput", "meaningInput", "exampleInput", "translationInput"];
+      const wordInput = document.getElementById("wordInput");
+      wordInput.addEventListener("paste", function(e) {
+        const text = (e.clipboardData || window.clipboardData).getData('Text');
+        const lines = text.split(/\r\n|\r|\n|\t/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length >= 4) {
+          e.preventDefault();
+          document.getElementById("wordInput").value = lines[0];
+          document.getElementById("meaningInput").value = lines[1];
+          document.getElementById("exampleInput").value = lines[2];
+          document.getElementById("translationInput").value = lines[3];
+          updateApplyButton();
+        }
+      });
+      inputs.forEach(id => document.getElementById(id).addEventListener("input", updateApplyButton));
+    }
+
+    function updateApplyButton() {
+      const vals = ["wordInput", "meaningInput", "exampleInput", "translationInput"].map(id => document.getElementById(id).value.trim());
+      const ok = vals.every(v => v.length > 0);
+      const btn = document.getElementById("applyBtn");
+      btn.classList.toggle("disabled", !ok); btn.disabled = !ok;
+    }
+
+    function applyCard(restore = false) {
+      const word = document.getElementById("wordInput").value.trim();
+      if (!word) return;
+      cards.push({
+        word, meaning: document.getElementById("meaningInput").value.trim(),
+        example: document.getElementById("exampleInput").value.trim(),
+        translation: document.getElementById("translationInput").value.trim(),
+        isWrong: null, isFavorite: favoriteCards.some(f => f.word === word)
+      });
+      ["wordInput", "meaningInput", "exampleInput", "translationInput"].forEach(id => document.getElementById(id).value = "");
+      renderInputScreen(restore);
+    }
+
+    function generateCards() { currentIndex = 0; initialCards = JSON.parse(JSON.stringify(cards)); renderCard(); }
+
+    function renderCard() {
+      const data = cards[currentIndex];
+      const stackCount = Math.min(cards.length - currentIndex - 1, 5);
+      const stack = Array.from({ length: stackCount >= 0 ? stackCount : 0 })
+        .map((_, i) => `<div class="stack-card" style="transform: translate(${(i + 1) * 6}px, ${(i + 1) * 6}px); z-index: ${10 - i};"></div>`).join("");
+      
+      cardFrame.innerHTML = `
+        <div class="card-container">
+          <div id="toast" class="toast-msg"></div>
+          <div class="card-stack" id="cardStack">${stack}</div>
+          <div class="card" id="card" style="z-index: 11;" onclick="flipCard()">
+            <div class="card-face card-front">
+              <div class="top-right-controls">
+                <button class="icon-button sound" onclick="speakText(event, '${data.word.replace(/'/g, "\\'")}', true)">🔊</button>
+              </div>
+              <div class="front-word">${data.word}</div>
+              <div class="bottom-right">
+                <span style="font-size: 14px; font-weight: 600; color: #94a3b8;">${currentIndex + 1} / ${cards.length}</span>
+              </div>
+            </div>
+            <div class="card-face card-back">
+              <button class="fav-btn ${data.isFavorite ? 'active' : ''}" onclick="toggleFavorite(event)">★</button>
+              <div class="top-right-controls">
+                <button class="icon-button correct ${data.isWrong === false ? 'active' : ''}" onclick="markCorrect(event)">✔</button>
+                <button class="icon-button wrong ${data.isWrong === true ? 'active' : ''}" onclick="markWrong(event)">✖</button>
+                <button class="icon-button sound" onclick="speakText(event, '${data.example.replace(/'/g, "\\'")}')">🔊</button>
+              </div>
+              <div class="back-content"><div class="back-meaning">${data.meaning}</div><div class="back-example">${data.example}</div><div class="back-translation">${data.translation}</div></div>
+              <div class="bottom-right">
+                <span style="font-size: 14px; font-weight: 600; color: #94a3b8;">${currentIndex + 1} / ${cards.length}</span>
+                <button id="nextBtn" class="nav-button ${data.isWrong === null ? 'disabled' : ''}" onclick="nextCard(event)" ${data.isWrong === null ? 'disabled' : ''}>Next</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function flipCard() { document.getElementById("card").classList.toggle("is-flipped"); }
+
+    function toggleFavorite(e) {
+      e.stopPropagation(); const d = cards[currentIndex]; d.isFavorite = !d.isFavorite;
+      if (d.isFavorite) { if (!favoriteCards.find(c => c.word === d.word)) { favoriteCards.push({...d, isWrong: null}); saveFavorites(); } showToast("Added to Favorites"); }
+      else { favoriteCards = favoriteCards.filter(c => c.word !== d.word); saveFavorites(); }
+      document.querySelectorAll('.fav-btn').forEach(b => b.classList.toggle('active', d.isFavorite));
+    }
+
+    function showToast(m) { const t = document.getElementById("toast"); if (t) { t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1000); } }
+
+    function markCorrect(e) { e.stopPropagation(); cards[currentIndex].isWrong = false; updateUI(); }
+    function markWrong(e) { e.stopPropagation(); cards[currentIndex].isWrong = true; updateUI(); }
+
+    function updateUI() {
+      const d = cards[currentIndex];
+      document.querySelector(".icon-button.correct").classList.toggle("active", d.isWrong === false);
+      document.querySelector(".icon-button.wrong").classList.toggle("active", d.isWrong === true);
+      const b = document.getElementById("nextBtn"); b.classList.remove("disabled"); b.disabled = false;
+    }
+
+    function nextCard(e) {
+      e.stopPropagation();
+      const d = cards[currentIndex];
+      const card = document.getElementById("card");
+      const stacks = document.querySelectorAll(".stack-card");
+
+      if (d.isWrong === false) {
+        card.classList.add("slide-out-anim");
+        stacks.forEach((s, i) => {
+          const nextOffset = i * 6;
+          s.style.transform = `translate(${nextOffset}px, ${nextOffset}px)`;
+        });
+        setTimeout(() => proceed(), 400);
+      } else {
+        wrongCards.push(d);
+        proceed();
+      }
+    }
+
+    function proceed() { currentIndex++; if (currentIndex >= cards.length) renderEnd(); else renderCard(); }
+
+    function renderEnd() {
+      cardFrame.innerHTML = `
+        <div class="end-screen">
+          <p>Study Completed.<br>${wrongCards.length === 0 ? 'Perfect! Want to study again?' : 'Review only wrong cards?'}</p>
+          <div class="end-buttons">
+            <button class="nav-button" onclick="restartStudy()">Study (Shuffle)</button>
+            <button class="nav-button" onclick="stopAndCleanup()">Stop</button>
+          </div>
+        </div>`;
+    }
+
+    function stopAndCleanup() { cards = []; initialCards = []; renderInputScreen(); }
+
+    function restartStudy() {
+      if (wrongCards.length === 0) {
+        cards = initialCards.map(c => ({ ...c, isWrong: null }));
+      } else {
+        const s = [...wrongCards];
+        for (let i = s.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [s[i], s[j]] = [s[j], s[i]]; }
+        cards = s.map(c => ({ ...c, isWrong: null }));
+      }
+      wrongCards = []; currentIndex = 0; renderCard();
+    }
+
+    renderInputScreen();
+  </script>
+</body>
+</html>

@@ -111,7 +111,9 @@
 
     .card {
       width: 100%; height: 100%; position: absolute;
-      top: 0; left: 0; transform-style: preserve-3d;
+      top: 0; left: 0; 
+      -webkit-transform-style: preserve-3d;
+      transform-style: preserve-3d;
       transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s; cursor: pointer;
     }
 
@@ -120,7 +122,7 @@
 
     .card-face {
       width: 100%; height: 100%; position: absolute;
-      /* 핵심 수정: 뒷면이 비쳐 보이지 않도록 강력하게 차단 */
+      /* iOS Safari의 잔상 방지 */
       -webkit-backface-visibility: hidden;
       backface-visibility: hidden; 
       border-radius: 24px; box-sizing: border-box;
@@ -128,8 +130,18 @@
       background: white;
     }
     
-    /* 뒷면은 180도 미리 회전되어 등지고 있음 */
-    .card-back { transform: rotateY(180deg); }
+    /* 앞면은 약간 앞으로, 뒷면은 약간 뒤로 물리적 간격을 두어 아이폰에서 겹침 방지 */
+    .card-front { 
+      -webkit-transform: translateZ(1px);
+      transform: translateZ(1px); 
+      z-index: 2;
+    }
+    
+    .card-back { 
+      -webkit-transform: rotateY(180deg) translateZ(1px);
+      transform: rotateY(180deg) translateZ(1px); 
+      z-index: 1;
+    }
 
     .fav-btn { position: absolute; top: 16px; left: 16px; background: none; border: none; font-size: 28px; cursor: pointer; color: #cbd5e1; z-index: 30; }
     .fav-btn.active { color: #fbbf24; }
@@ -325,11 +337,7 @@
                 <button class="icon-button wrong ${data.isWrong === true ? 'active' : ''}" onclick="markWrong(event)">✖</button>
                 <button class="icon-button sound" onclick="speakText(event, '${data.example.replace(/'/g, "\\'")}')">🔊</button>
               </div>
-              <div class="back-content">
-                <div class="back-meaning">${data.meaning}</div>
-                <div class="back-example">${data.example}</div>
-                <div class="back-translation">${data.translation}</div>
-              </div>
+              <div class="back-content"><div class="back-meaning">${data.meaning}</div><div class="back-example">${data.example}</div><div class="back-translation">${data.translation}</div></div>
               <div class="bottom-right">
                 <span style="font-size: 14px; font-weight: 600; color: #94a3b8;">${currentIndex + 1} / ${cards.length}</span>
                 <button id="nextBtn" class="nav-button ${data.isWrong === null ? 'disabled' : ''}" onclick="nextCard(event)" ${data.isWrong === null ? 'disabled' : ''}>Next</button>

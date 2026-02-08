@@ -2,30 +2,47 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>English Flash Cards</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  
   <style>
+    :root {
+      /* 아이폰 노치 및 하단 바 여백 대응 */
+      --sat: env(safe-area-inset-top);
+      --sab: env(safe-area-inset-bottom);
+    }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #e2e8f0; /* 전체 페이지 배경 (더 짙은 회색) */
+      background: #e2e8f0;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      /* 아이폰 전체 화면 시 높이 보정 */
+      height: -webkit-fill-available;
       overflow: hidden;
     }
 
     #app {
       width: 100%; height: 100%;
       display: flex; justify-content: center; align-items: center;
-      padding: 20px; box-sizing: border-box;
+      padding: 20px; 
+      /* 하단 Safe Area만큼 패딩 추가하여 버튼 가림 방지 */
+      padding-bottom: calc(20px + var(--sab));
+      box-sizing: border-box;
+      position: relative;
     }
 
-    /* ===== 카드 프레임: 내부 배경을 밝은 회색으로 변경 ===== */
+    /* ===== 카드 프레임: 세로 비율 최적화 ===== */
     .card-frame {
-      width: 100%; max-width: 900px; height: 70vh;
-      background: #f1f5f9; /* 카드 뒤쪽 배경색 (밝은 회색) */
+      width: 100%; max-width: 900px; 
+      height: 85vh; /* 아이폰 세로 화면에 더 꽉 차도록 높이 상향 */
+      background: #f1f5f9;
       border-radius: 24px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
       padding: 24px; box-sizing: border-box;
@@ -34,18 +51,17 @@
     }
 
     @media (max-aspect-ratio: 1/1) {
-      .card-frame { height: 80vh; max-height: 700px; }
+      .card-frame { height: 85vh; max-height: 850px; }
       .front-word { font-size: 10vw !important; }
       .back-meaning { font-size: 8vw !important; }
     }
 
-    /* ===== 초기 입력 화면 ===== */
     .input-screen {
       width: 100%; height: 100%; display: flex;
       flex-direction: column; gap: 16px; position: relative; z-index: 10;
     }
 
-    .input-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .input-grid { flex: 0.8; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 600px) { .input-grid { grid-template-columns: 1fr; } }
 
     .input-grid input {
@@ -55,9 +71,9 @@
     }
 
     .favorites-list-container {
-      flex: 1; border: 1px solid #e2e8f0; border-radius: 12px;
+      flex: 1.2; border: 1px solid #e2e8f0; border-radius: 12px;
       background: white; display: flex; flex-direction: column;
-      overflow: hidden; /* 헤더 고정을 위해 전체 오버플로우 숨김 */
+      overflow: hidden; 
     }
 
     .favorites-header {
@@ -68,7 +84,7 @@
 
     .favorites-items { 
       padding: 8px; display: flex; flex-direction: column; gap: 4px;
-      flex: 1; overflow-y: auto; /* 내용물 부분만 스크롤 적용 */
+      flex: 1; overflow-y: auto; 
     }
 
     .fav-item {
@@ -85,10 +101,8 @@
     .create-button { background: #2563eb; color: white; }
     .create-button.disabled { background: #94a3b8; cursor: not-allowed; }
 
-    /* 이전 카드 내부에 있던 saved-count 스타일 유지하되 필요시 로직으로 제어 */
     .saved-count-text { font-size: 14px; color: #2563eb; position: absolute; right: 16px; }
 
-    /* ===== 카드 컨테이너 및 스택 애니메이션 ===== */
     .card-container { width: 100%; height: 100%; position: relative; display: flex; justify-content: center; align-items: center; z-index: 5; }
 
     .card-stack { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; pointer-events: none; }
@@ -127,12 +141,9 @@
     .toast-msg.show { opacity: 1; }
 
     .top-right-controls { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; z-index: 30; }
-    .icon-button { width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 20px; cursor: pointer; background: #f1f5f9; display: flex; justify-content: center; align-items: center; border: 1px solid #e2e8f0; }
+    .icon-button { width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 20px; cursor: pointer; background: #f1f5f9; display: flex; justify-content: center; align-items: center; border: 1px solid #e2e8f0; transition: all 0.2s; }
     .icon-button.correct.active { background: #22c55e !important; color: white !important; border-color: #22c55e; }
     .icon-button.wrong.active { background: #ef4444 !important; color: white !important; border-color: #ef4444; }
-
-    /* 사운드 버튼 스타일 */
-    .icon-button.sound { font-size: 18px; color: #64748b; }
     .icon-button.sound:hover { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
 
     .bottom-right { position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 12px; z-index: 30; }
@@ -161,7 +172,6 @@
     let favoriteCards = JSON.parse(localStorage.getItem('myFavoriteCards')) || [];
     let lastScrollTop = 0;
 
-    /* TTS 설정 */
     const synth = window.speechSynthesis;
     let maleVoice = null;
 
@@ -175,13 +185,7 @@
     function speakText(e, text, isFront = false) {
       e.stopPropagation(); 
       if (synth.speaking) synth.cancel();
-      
-      let processedText = text;
-      if (isFront) {
-        // 요구사항: 앞면에서는 '~'는 읽지 않고 기호만 읽음
-        processedText = text.replace(/~/g, " ");
-      }
-      
+      let processedText = isFront ? text.replace(/~/g, " ") : text;
       const utter = new SpeechSynthesisUtterance(processedText);
       if (maleVoice) utter.voice = maleVoice;
       utter.lang = 'en-US';
@@ -211,6 +215,8 @@
         ? favoriteCards.map((c, index) => `<div class="fav-item" onclick="applyFromFav(${index})"><span>${c.word}</span><span class="fav-del-btn" onclick="deleteFavorite(event, ${index})">✕</span></div>`).join('')
         : '<div style="text-align:center; color:#94a3b8; padding:20px;">No favorites yet.</div>';
       
+      const countLabel = window.innerWidth <= 600 ? `${cards.length}` : `Saved: ${cards.length}`;
+
       cardFrame.innerHTML = `
         <div id="toast" class="toast-msg"></div>
         <div class="input-screen">
@@ -223,7 +229,7 @@
           <div class="favorites-list-container">
             <div class="favorites-header">
               <span>Favorites (Click to Add)</span>
-              <span class="saved-count-text">Saved: ${cards.length}</span>
+              <span class="saved-count-text">${countLabel}</span>
             </div>
             <div class="favorites-items">${favoritesHTML}</div>
           </div>
@@ -393,6 +399,10 @@
       }
       wrongCards = []; currentIndex = 0; renderCard();
     }
+
+    window.addEventListener('resize', () => {
+      if (document.querySelector('.input-screen')) renderInputScreen(true);
+    });
 
     renderInputScreen();
   </script>
